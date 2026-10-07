@@ -1,5 +1,7 @@
 # Grand Line Defense
 
+**Play online:** https://manganjokean.github.io/grand-line-defense/
+
 A standalone, fan-made One Piece tower defense game. Open `index.html` in a browser—no installation, build step, or server required. All character portraits are original vector drawings included in the game, so the gameplay works offline (the optional Google Fonts fall back to system fonts).
 
 ## How to play
