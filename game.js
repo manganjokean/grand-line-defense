@@ -30,7 +30,7 @@
   }
 
   const $ = id => document.getElementById(id);
-  const board = $('board'), grid = $('board-grid'), layer = $('entity-layer');
+  const board = $('board'), grid = $('board-grid'), layer = $('entity-layer'), attackLayer = $('attack-layer');
   const crewGrid = $('crew-grid'), details = $('details-panel');
   const rangeIndicator = $('range-indicator');
   const startButton = $('start-button'), pauseButton = $('pause-button'), speedButton = $('speed-button');
@@ -291,7 +291,103 @@
     }
     if (enemy.hp <= 0) removeEnemy(enemy);
   }
+  // Attack art lives in board coordinates so weapons stay aligned at every screen size.
+  function attackArt(attack) {
+    const {tower, target, age, duration} = attack;
+    if (!target.dead) { attack.targetX = target.x; attack.targetY = target.y; }
+    const dx = attack.targetX - tower.x, dy = attack.targetY - tower.y;
+    const distance = Math.max(1, Math.hypot(dx,dy));
+    const angle = Math.atan2(dy,dx) * 180 / Math.PI;
+    const progress = Math.min(1,age/duration);
+    const ease = t => 1 - Math.pow(1-t,3);
+    const reach = progress < .4 ? ease(progress/.4) : progress < .68 ? 1 : Math.max(0,(1-progress)/.32);
+    const opacity = progress > .82 ? (1-progress)/.18 : 1;
+    const tip = Math.max(19,distance*reach);
+    let art = '';
+
+    switch (tower.hero.id) {
+      case 'luffy': {
+        const curve = -13 * Math.sin(reach*Math.PI);
+        art = `<path d="M 13 0 Q ${Math.round(tip*.53)} ${Math.round(curve)} ${Math.round(tip)} 0" fill="none" stroke="#7e4d3d" stroke-width="30" stroke-linecap="round"/>
+          <path d="M 13 0 Q ${Math.round(tip*.53)} ${Math.round(curve)} ${Math.round(tip)} 0" fill="none" stroke="#efbb91" stroke-width="21" stroke-linecap="round"/>
+          <path d="M ${Math.round(tip-23)} -10 L ${Math.round(tip-23)} 10" stroke="#ba473f" stroke-width="7"/>
+          <ellipse cx="${Math.round(tip+7)}" cy="0" rx="19" ry="15" fill="#efbb91" stroke="#7e4d3d" stroke-width="3"/>
+          <path d="M ${Math.round(tip+4)} -11 v8 M ${Math.round(tip+11)} -10 v7 M ${Math.round(tip+17)} -7 v6" stroke="#b87e66" stroke-width="2.5" stroke-linecap="round"/>`;
+        break;
+      }
+      case 'zoro': {
+        const bladeTip = Math.max(27,tip-7);
+        art = [-17,0,17].map((offset,i) => {
+          const endY = Math.round(offset*.24 + (i-1)*5);
+          return `<path d="M 8 ${offset} L 24 ${offset}" stroke="#57463c" stroke-width="8" stroke-linecap="round"/>
+            <path d="M 20 ${offset-9} L 20 ${offset+9}" stroke="#e6b465" stroke-width="5" stroke-linecap="round"/>
+            <path d="M 23 ${offset-4} L ${Math.round(bladeTip-8)} ${endY-3} L ${Math.round(bladeTip)} ${endY} L ${Math.round(bladeTip-8)} ${endY+3} L 23 ${offset+4} Z" fill="#e5f6e8" stroke="#416a62" stroke-width="2"/>`;
+        }).join('');
+        const slash = Math.min(1,Math.max(0,(reach-.45)*2.2));
+        art += `<g opacity="${slash.toFixed(2)}" fill="none" stroke-linecap="round"><path d="M ${Math.round(distance-33)} -37 Q ${Math.round(distance+23)} -7 ${Math.round(distance-22)} 33" stroke="#bbf9da" stroke-width="8"/><path d="M ${Math.round(distance-12)} -38 Q ${Math.round(distance+30)} 0 ${Math.round(distance-12)} 39" stroke="#e9fff4" stroke-width="4"/><path d="M ${Math.round(distance-39)} 1 Q ${Math.round(distance)} 34 ${Math.round(distance+18)} 12" stroke="#8eebc1" stroke-width="4"/></g>`;
+        break;
+      }
+      case 'usopp': {
+        const pull = progress < .34 ? 20 - 9*ease(progress/.34) : 11 + 23*ease(Math.min(1,(progress-.34)/.4));
+        art = `<path d="M 8 0 L 27 0 L 44 -18 M 27 0 L 44 18" fill="none" stroke="#563d2e" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 8 0 L 27 0 L 44 -18 M 27 0 L 44 18" fill="none" stroke="#bc864b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 44 -18 L ${pull.toFixed(1)} 0 L 44 18" fill="none" stroke="#f4dda6" stroke-width="3" stroke-linecap="round"/>
+          <ellipse cx="${pull.toFixed(1)}" cy="0" rx="7" ry="5" fill="#6b4930" stroke="#e2bf78" stroke-width="2"/>
+          <circle cx="44" cy="-18" r="4" fill="#d4a763"/><circle cx="44" cy="18" r="4" fill="#d4a763"/>`;
+        break;
+      }
+      case 'sanji': {
+        const knee = Math.max(28,tip*.58);
+        art = `<path d="M 12 7 Q ${Math.round(knee*.55)} -22 ${Math.round(knee)} -16 L ${Math.round(tip-12)} -2" fill="none" stroke="#121b27" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 12 7 Q ${Math.round(knee*.55)} -22 ${Math.round(knee)} -16 L ${Math.round(tip-12)} -2" fill="none" stroke="#30394c" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M ${Math.round(tip-12)} -10 Q ${Math.round(tip+11)} -14 ${Math.round(tip+19)} 0 Q ${Math.round(tip+21)} 11 ${Math.round(tip-12)} 9Z" fill="#1b2028" stroke="#e5b673" stroke-width="3"/>
+          <path d="M ${Math.round(tip-2)} -17 q 12 -19 10 -27 q 18 17 5 31 M ${Math.round(tip+10)} 19 q 18 6 25 -10 q 2 20 -18 23" fill="#ffb14f" stroke="#f57145" stroke-width="3" stroke-linejoin="round" opacity="${reach.toFixed(2)}"/>`;
+        break;
+      }
+      case 'nami': {
+        const boltEnd = Math.max(53,tip);
+        const span = boltEnd-49;
+        const bolt = `M 49 -26 L ${Math.round(49+span*.28)} -35 L ${Math.round(49+span*.44)} -10 L ${Math.round(49+span*.66)} -22 L ${Math.round(49+span*.78)} 4 L ${Math.round(boltEnd)} 0`;
+        art = `<path d="M 8 20 L 49 -27" stroke="#334651" stroke-width="11" stroke-linecap="round"/>
+          <path d="M 8 20 L 49 -27" stroke="#f6e9b6" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="11" cy="17" r="8" fill="#edb77c" stroke="#fff4d3" stroke-width="2"/>
+          <circle cx="30" cy="-5" r="7" fill="#a7e4cf" stroke="#fff4d3" stroke-width="2"/>
+          <circle cx="49" cy="-27" r="8" fill="#8bcdf1" stroke="#fff4d3" stroke-width="2"/>
+          <path d="${bolt}" fill="none" stroke="#48c7f0" stroke-width="13" stroke-linejoin="round" opacity=".6"/>
+          <path d="${bolt}" fill="none" stroke="#f5ffff" stroke-width="4" stroke-linejoin="round"/>`;
+        break;
+      }
+      case 'chopper': {
+        art = [-13,13].map(offset => `<path d="M 12 ${offset*.55} Q ${Math.round(tip*.52)} ${offset*1.8} ${Math.round(tip-12)} ${offset}" fill="none" stroke="#7b5043" stroke-width="16" stroke-linecap="round"/>
+          <path d="M 12 ${offset*.55} Q ${Math.round(tip*.52)} ${offset*1.8} ${Math.round(tip-12)} ${offset}" fill="none" stroke="#b8866b" stroke-width="10" stroke-linecap="round"/>
+          <ellipse cx="${Math.round(tip)}" cy="${offset}" rx="13" ry="10" fill="#91604d" stroke="#593e3b" stroke-width="2"/>
+          <path d="M ${Math.round(tip+1)} ${offset-8} v16" stroke="#593e3b" stroke-width="2.5" stroke-linecap="round"/>`).join('');
+        art += `<path d="M ${Math.round(distance-18)} -33 l-8 -11 M ${Math.round(distance+12)} -24 l8 -10 M ${Math.round(distance+15)} 24 l10 9" fill="none" stroke="#ffd3db" stroke-width="4" stroke-linecap="round" opacity="${reach.toFixed(2)}"/>`;
+        break;
+      }
+    }
+    return `<g transform="translate(${tower.x} ${tower.y}) rotate(${angle.toFixed(1)})" opacity="${opacity.toFixed(2)}">${art}</g>`;
+  }
+  function showAttack(tower,target) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg','g');
+    el.classList.add('attack-effect');
+    attackLayer.appendChild(el);
+    const durations = {luffy:.52,zoro:.39,usopp:.4,sanji:.43,nami:.42,chopper:.43};
+    const attack = {el,tower,target,targetX:target.x,targetY:target.y,age:0,duration:durations[tower.hero.id]};
+    state.attacks.push(attack);
+    el.innerHTML = attackArt(attack);
+    if (state.attacks.length > 36) state.attacks.shift().el.remove();
+  }
+  function updateAttacks(dt) {
+    for (let i=state.attacks.length-1;i>=0;i--) {
+      const attack = state.attacks[i];
+      attack.age += dt;
+      if (attack.age >= attack.duration) { attack.el.remove(); state.attacks.splice(i,1); }
+      else attack.el.innerHTML = attackArt(attack);
+    }
+  }
   function fire(tower,target) {
+    showAttack(tower,target);
     const el = document.createElement('div');
     el.className = `projectile ${tower.hero.id}`;
     placeElement(el,tower.x,tower.y);
@@ -369,6 +465,8 @@
     state.inspectedTower = null;
     for (const p of state.projectiles) p.el.remove();
     state.projectiles = [];
+    attackLayer.replaceChildren();
+    state.attacks = [];
     overlay.classList.remove('hidden');
     overlay.innerHTML = `<div class="overlay-content"><span class="overlay-symbol">${won ? '✦' : '☠'}</span><h2>${won ? 'The sea is yours!' : 'The Sunny has fallen.'}</h2><p>${won ? `You held off all ${MAX_WAVES} Marine waves and kept the Straw Hats sailing. The adventure continues!` : `You survived to wave ${state.wave} and defeated ${state.kills} Marines. Rally the crew and give it another shot.`}</p><button type="button" id="overlay-restart">Play again →</button></div>`;
     $('overlay-restart').addEventListener('click',resetGame);
@@ -376,10 +474,11 @@
   }
   function resetGame() {
     layer.replaceChildren();
+    attackLayer.replaceChildren();
     overlay.classList.add('hidden');
     overlay.innerHTML = '';
     nextId = 0;
-    state = {wave:0,lives:MAX_LIVES,money:220,kills:0,phase:'ready',selectedType:null,inspectedTower:null,towers:[],enemies:[],projectiles:[],queue:[],spawnTimer:0,paused:false,speed:1};
+    state = {wave:0,lives:MAX_LIVES,money:220,kills:0,phase:'ready',selectedType:null,inspectedTower:null,towers:[],enemies:[],projectiles:[],attacks:[],queue:[],spawnTimer:0,paused:false,speed:1};
     grid.querySelectorAll('.tile.occupied').forEach(tile => tile.classList.remove('occupied'));
     setTip('Place your crew near bends in the path to cover more ground.');
     updateHUD();
@@ -391,6 +490,7 @@
       updateBattle(dt*state.speed);
       if (state.phase === 'running') $('status-description').textContent = `${state.queue.length + state.enemies.length} Marines remaining · Protect the Sunny!`;
     }
+    if (!state.paused && state.attacks.length) updateAttacks(dt*state.speed);
     requestAnimationFrame(frame);
   }
 
